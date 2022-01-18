@@ -1,6 +1,5 @@
 import os
 import sys
-
 import pygame
 import random
 
@@ -10,7 +9,8 @@ pygame.init()
 size = width, height = 1000, 800
 screen = pygame.display.set_mode(size)
 clock = pygame.time.Clock()
-isJump = True
+isCanJump = False    # станет True при нажатии пробела
+isJump = False    # для прыжка
 v = 100
 fps = 30
 COUNT_LIFE = 3
@@ -43,14 +43,14 @@ def load_level(filename):
 fon = pygame.transform.scale(load_image('фон-1.png'), (1000, 800))
 screen.blit(fon, (0, 0))
 
-tile_width = 60
-tile_height = 30
+tile_width = 60    # стандартные
+tile_height = 30    # размеры тайлов
 
 tile_images = {
     'platform': load_image('platform.png'),
     'portal': load_image('portal.png'),
     'hole': load_image('black_hole.png')
-}
+}    # некоторые тайлы имеют личный pygame.Surface и им нет дела до загрузки каких-то картинок
 
 
 class Tile(pygame.sprite.Sprite):
@@ -64,24 +64,33 @@ class Tile(pygame.sprite.Sprite):
             super().__init__(tiles_group, all_sprites, portal_group)
             self.image = tile_images[tile_type]
             self.rect = self.image.get_rect().move(
-                tile_width * pos_x, tile_height * pos_y + 460)
+                tile_width * pos_x, tile_height * pos_y + 400)
         elif tile_type == 'hole':
             super().__init__(tiles_group, all_sprites, hole_group)
             self.image = tile_images[tile_type]
             self.rect = self.image.get_rect().move(
                 tile_width * pos_x, tile_height * pos_y + 460)
-        elif tile_type == 'bottom':
-            super().__init__(tiles_group, all_sprites, platform_group)
-            self.image = pygame.Surface((tile_width, tile_height))
-            self.image.fill((0, 0, 0, 0))
+        elif tile_type == 'pre-platform':
+            # при встрече с платформой лицом к лицу, в засаде всегда ждет пре-пратформа
+            # она, подобно черной дыре, отправит на спавн
+            super().__init__(tiles_group, all_sprites, hole_group)
+            self.image = pygame.Surface((tile_width // 6, tile_height // 2))
+            self.image.fill((0, 0, 0))
+            self.image.set_colorkey((0, 0, 0))
             self.rect = self.image.get_rect().move(
-                tile_width * pos_x, tile_height * pos_y + 460)
+                tile_width * pos_x + 59, tile_height * pos_y + 465)
+        elif tile_type == 'bottom':
+            # Нужен для прыжка (был улучшен вечером 17.01.22 и теперь он монолитный)
+            super().__init__(tiles_group, all_sprites, platform_group)
+            self.image = pygame.Surface((1000, tile_height))
+            self.image.fill((0, 0, 0))
+            # self.image.set_colorkey((0, 0, 0))
+            self.rect = self.image.get_rect().move(0, 730)
         # else:
         #     super().__init__(tiles_group, all_sprites)
         #     self.image = tile_images[tile_type]
         #     self.rect = self.image.get_rect().move(
         #         tile_width * pos_x, tile_height * pos_y)
-
 
 image_hero = 'hero.png'
 jump_hero = 'jump.png'
@@ -105,42 +114,47 @@ class Player(pygame.sprite.Sprite):
         self.change_y = y
         self.flag_collide = False
 
-    def update(self, *args):
-        # Это if работает, если персонаж наступает на платформу
-        global isJump
-        on_platform_collide = pygame.sprite.spritecollideany(self, platform_group)
-        on_hole_collide = pygame.sprite.spritecollideany(self, hole_group)
-        on_portal_collide = pygame.sprite.spritecollideany(self, portal_group)
+    def update(self):
+        global isJump, isCanJump  # для возможности прыжка
+        # коллайды:
+        on_platform_collide = pygame.sprite.spritecollideany(self, platform_group)  # с платформой
+        on_hole_collide = pygame.sprite.spritecollideany(self, hole_group)    # с ч-дырой | пре-платформой
+        on_portal_collide = pygame.sprite.spritecollideany(self, portal_group)  # с порталом
         if on_platform_collide:
-            isJump = True
-            self.image = load_image(image_hero)
+            # коллайдимся с платформой, а значит:
             block_hit_list = pygame.sprite.spritecollide(self, platform_group, False)
             block = block_hit_list[0]
-            self.rect.bottom = block.rect.top  # это делает высоту персонажа равной
+            if self.rect.bottom <= block.rect.top + tile_height // 2:
+                # значит удар пришелся не на голову. череп не поврежден
+                self.velocity[1] = 0  # ниже пола нам падать не надо, верт. скорость обнуляется
+                isCanJump = True  # теперь можно прыгнуть, нужно лишь нажать на большую прямоугольную кнопку без текста
+                self.image = load_image(image_hero)  # стоим на земле и загружаем обычную картинку
+            elif self.rect.top >= block.rect.bottom - tile_height // 2:
+                # самому становится больно, когда понимаешь, как он шибанулся об платформу
+                self.velocity[1] = self.gravity * 2
             # высоте платформы
-            self.image = load_image(image_hero)
-            self.change_y = self.rect.y
+            #self.change_y = self.rect.y
+        else:
+            # problem(1)
+            self.velocity[1] += self.gravity  # пока мы в полете, прибавляем гравитацию
         if on_hole_collide:
-            # этот условие работает если персонаж наступил на чёрную дыру
+            # этот условие работает если персонаж угодил в чёрную дыру | пре-платформу
             global COUNT_LIFE
             self.rect.x = 0  # это возвращает персонажа в начало окна
             COUNT_LIFE -= 1  # это служит счётчиком жизни
         if on_portal_collide:
-            # данное условие выполняется если персонаж зашёл на портал
+            # данное условие выполняется если персонаж прошел через портал
             global FLAG_PRESENT  # флаг работает в основном цикле и если он True окно закрывается
             FLAG_PRESENT = True
+        if isCanJump and isJump:
+            # это условие необходимо для прыжка.
+            # isJump = True при нажатии пробела. isCanJump = True при коллайде с платформой
+            isJump, isCanJump = False, False  # а неча по воздуху шпарить прыжками. теперь только до приземления
+            self.velocity[1] = -self.gravity * 10    # усилие прыжка в 10 антигравитаций
+            self.image = load_image(jump_hero)  # тут изображение меняется на изображение прыжка
+        self.rect.x += self.velocity[0]  # тут мы по сути просто обновляем позицию
+        self.rect.y += self.velocity[1]  # игрока с учетом x,y скоростей
 
-        if args == ('Space',) and isJump:
-            # это условие необходимо для прыжка и возвращения персонажа на землю после прыжка
-            isJump = False
-            self.velocity[1] = -self.gravity * 10
-            self.image = load_image(jump_hero)  # тут обычное изображение меняется на изображение прыжка
-        if self.rect.y <= 670 and not on_platform_collide:
-            self.velocity[1] += self.gravity
-        else:
-            self.velocity[1] = 0
-        self.rect.x += self.velocity[0]
-        self.rect.y += self.velocity[1]
 
 tiles_group = pygame.sprite.Group()
 player_group = pygame.sprite.Group()
@@ -156,11 +170,13 @@ sprite_heart = pygame.sprite.Sprite()
 # sprite_heart.rect.x = 400
 # sprite_heart.rect.y = 400
 # all_sprites.add(sprite_heart)
-Player(all_sprites, 670)
+Player(all_sprites, 660)
 running = True
 
 
 def generate_level(level, tile_images):
+    for tile in tiles_group:
+        tile.kill()
     for y in range(len(level)):
         for x in range(len(level[y])):
             if level[y][x] == '#':
@@ -169,20 +185,22 @@ def generate_level(level, tile_images):
                 Tile('portal', x, y, tile_images)
             elif level[y][x] == 'H':
                 Tile('hole', x, y, tile_images)
+            elif level[y][x] == '<':
+                Tile('pre-platform', x, y, tile_images)
             elif level[y][x] == '-':
                 Tile('bottom', x, y, tile_images)
 
 
-screen.fill((255, 255, 255))
+#screen.fill((255, 255, 255))
 # player, level_x, level_y = generate_level(load_level('map.txt'))
 generate_level(load_level('location.txt'), tile_images)
-running_past = True
+running_past = False
 
 
 def present():
-    global running, FLAG_PRESENT, running_past
+    pygame.display.set_caption('American boy')
+    global running, FLAG_PRESENT
     while running:
-        pygame.display.set_caption('American boy')
         screen.blit(fon, (0, 0))
         # внутри игрового цикла ещё один цикл
         # приема и обработки сообщений
@@ -193,10 +211,11 @@ def present():
                 return
             if event.type == pygame.QUIT:
                 running = False
-                running_past = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    all_sprites.update('Space')
+                    global isJump
+                    isJump = True
+                    # all_sprites.update('Space')
         clock.tick(fps)
         all_sprites.update()
         all_sprites.draw(screen)
@@ -213,24 +232,26 @@ tile_images_past = {
     'platform': load_image('platform_past.png'),
     'portal': load_image('portal.png'),
     'hole': load_image('black_hole.png')
-}
-tiles_group = pygame.sprite.Group()
-player_group = pygame.sprite.Group()
+}    # когда-то в давным-давно некоторые тайлы знали лишь pygame.Surface и даже не подозревали о картинках
+'''
+tiles_group = pygame.sprite.Group()      # не уверен, что оно вообще тут нужно второй раз
+player_group = pygame.sprite.Group()     # мы уже задали это ранее
 platform_group = pygame.sprite.Group()
 portal_group = pygame.sprite.Group()
 hole_group = pygame.sprite.Group()
 all_sprites = pygame.sprite.Group()
-Player(all_sprites, 670)
-# running = True
-screen.fill((255, 255, 255))
+'''
+Player(all_sprites, 660)
+running = True
+#screen.fill((255, 255, 255))
 # player, level_x, level_y = generate_level(load_level('map.txt'))
 generate_level(load_level('location_past.txt'), tile_images_past)
 
 
 def past():
+    pygame.display.set_caption('American boy in past')
     global running, FLAG_PRESENT
     while running:
-        pygame.display.set_caption('American boy')
         screen.blit(fon_past, (0, 0))
         # внутри игрового цикла ещё один цикл
         # приема и обработки сообщений
@@ -242,7 +263,9 @@ def past():
                 running = False
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    all_sprites.update('Space')
+                    global isJump
+                    isJump = True
+                    # all_sprites.update('Space')
         clock.tick(fps)
         all_sprites.update()
         all_sprites.draw(screen)
