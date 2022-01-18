@@ -13,7 +13,7 @@ screen = pygame.display.set_mode(size)
 clock = pygame.time.Clock()
 v = 100
 fps = 30
-COUNT_LIFE = 2
+COUNT_LIFE = 3
 FLAG_PRESENT = False
 PLATFORM_LEVEL = 0
 FLAG_GAME = False
@@ -83,12 +83,13 @@ class Tile(pygame.sprite.Sprite):
         #         tile_width * pos_x, tile_height * pos_y)
 
 
-image_hero = 'hero.png'
+# image_hero = [load_image('step_1.png'), load_image('step_2.png')]
+image_hero = 'step_1.png'
 jump_hero = 'jump.png'
 
 
 class Player(pygame.sprite.Sprite):
-    global image_hero, jump_hero
+    global jump_hero, image_hero
     # image = load_image(image_hero)
     image = [load_image('step_1.png'), load_image('step_2.png')]
 
@@ -115,19 +116,36 @@ class Player(pygame.sprite.Sprite):
                 self.image = load_image(image_hero)
                 # здесь меняется изображение с прыжка на обычное
                 self.change_y = self.rect.y
-        elif pygame.sprite.spritecollideany(self, hole_group):
+        if pygame.sprite.spritecollideany(self, hole_group):
             # этот условие работает если персонаж наступил на чёрную дыру
-            global COUNT_LIFE, fon, fon_past, FLAG_GAME
+            global COUNT_LIFE, fon, fon_past, FLAG_GAME, list_hearts, heart_group
             self.rect.x = 0  # это возвращает персонажа в начало окна
             COUNT_LIFE -= 1  # это служит счётчиком жизни
+            del list_hearts[-1]
+            for sprites in heart_group:
+                sprites.kill()
+            length = 0
+            sprite_heart = pygame.sprite.Sprite()
+            for j in range(len(list_hearts)):
+                rect_y = 100
+                heart_image = load_image('heart.png')
+                heart_image.set_colorkey('white')
+                image2 = pygame.transform.scale(heart_image, (300, 100))
+                sprite_heart.image = image2
+                sprite_heart.rect = sprite_heart.image.get_rect()
+                sprite_heart.rect.x = length
+                sprite_heart.rect.y = rect_y
+                heart_group.add(sprite_heart)
+                sprite_heart = pygame.sprite.Sprite()
+                length += 200
             if COUNT_LIFE == 0:
                 FLAG_GAME = True
-        elif pygame.sprite.spritecollideany(self, portal_group):
+        if pygame.sprite.spritecollideany(self, portal_group):
             # данное условие выполняется если персонаж зашёл на портал
             global FLAG_PRESENT  # флаг работает в основном цикле и если он True окно закрывается
             FLAG_PRESENT = True
             return
-        elif args == ('Space',) or self.rect.y < self.change_y:
+        if args == ('Space',) or self.rect.y < self.change_y:
             # это условие необходимо для прыжка и возвращения персонажа на землю после прыжка
             if not pygame.sprite.spritecollideany(self, platform_group):
                 self.change_y = 670  # это будет высотой на которой ходит персонаж по земле
@@ -152,13 +170,21 @@ portal_group = pygame.sprite.Group()
 hole_group = pygame.sprite.Group()
 all_sprites = pygame.sprite.Group()
 sprite_heart = pygame.sprite.Sprite()
-# heart_image = load_image('heart.png', colorkey=-1)
-# image2 = pygame.transform.scale(heart_image, (300, 100))
-# sprite_heart.image = image2
-# sprite_heart.rect = sprite_heart.image.get_rect()
-# sprite_heart.rect.x = 400
-# sprite_heart.rect.y = 400
-# all_sprites.add(sprite_heart)
+heart_group = pygame.sprite.Group()
+list_hearts = [1, 1, 1]
+rect_x = 0
+for i in range(3):
+    rect_y = 100
+    heart_image = load_image('heart.png')
+    heart_image.set_colorkey('white')
+    image2 = pygame.transform.scale(heart_image, (300, 100))
+    sprite_heart.image = image2
+    sprite_heart.rect = sprite_heart.image.get_rect()
+    sprite_heart.rect.x = rect_x
+    sprite_heart.rect.y = rect_y
+    heart_group.add(sprite_heart)
+    sprite_heart = pygame.sprite.Sprite()
+    rect_x += 200
 player = Player(all_sprites, 670)
 running = True
 
@@ -200,6 +226,8 @@ def game_over():
 
 
 flag_pause = False
+index = 0
+current_frame = 0
 
 
 def present():
@@ -231,6 +259,7 @@ def present():
         else:
             pygame.mixer.pause()
         all_sprites.draw(screen)
+        heart_group.draw(screen)
         pygame.display.flip()
 
 
@@ -270,6 +299,7 @@ def past():
         for event in pygame.event.get():
             # при закрытии окна
             if FLAG_PRESENT:
+                FLAG_PRESENT = False
                 return
             if FLAG_GAME:
                 return
@@ -290,6 +320,7 @@ def past():
         else:
             pygame.mixer.pause()
         all_sprites.draw(screen)
+        heart_group.draw(screen)
         pygame.display.flip()
 
 
@@ -297,3 +328,61 @@ past()
 
 if FLAG_GAME:
     game_over()
+
+image_hero = 'hero_future.png'
+jump_hero = 'jump_future.png'
+fon_future = pygame.transform.scale(load_image('Future_location.jpg'), (1000, 800))
+screen.blit(fon, (0, 0))
+tile_images_future = {
+    'platform': load_image('Platform_future.png'),
+    'portal': load_image('Портал.png'),
+    'hole': load_image('Чёрная дыра.png')
+}
+tiles_group = pygame.sprite.Group()
+player_group = pygame.sprite.Group()
+platform_group = pygame.sprite.Group()
+portal_group = pygame.sprite.Group()
+hole_group = pygame.sprite.Group()
+all_sprites = pygame.sprite.Group()
+Player(all_sprites, 670)
+# running = True
+screen.fill((255, 255, 255))
+# player, level_x, level_y = generate_level(load_level('map.txt'))
+generate_level(load_level('american_boy_future.txt'), tile_images_future)
+
+
+def future():
+    global running, FLAG_PRESENT, FLAG_GAME, flag_pause
+    while running:
+        pygame.display.set_caption('American boy')
+        screen.blit(fon_future, (0, 0))
+        # внутри игрового цикла ещё один цикл
+        # приема и обработки сообщений
+        for event in pygame.event.get():
+            # при закрытии окна
+            if FLAG_PRESENT:
+                return
+            if FLAG_GAME:
+                return
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    all_sprites.update('Space')
+                if event.key == pygame.K_ESCAPE:
+                    if not flag_pause:
+                        flag_pause = True
+                    else:
+                        flag_pause = False
+        clock.tick(fps)
+        if not flag_pause:
+            all_sprites.update()
+            pygame.mixer.unpause()
+        else:
+            pygame.mixer.pause()
+        all_sprites.draw(screen)
+        heart_group.draw(screen )
+        pygame.display.flip()
+
+
+future()
