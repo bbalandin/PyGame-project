@@ -9,10 +9,12 @@ pygame.init()
 size = width, height = 1000, 800
 screen = pygame.display.set_mode(size)
 clock = pygame.time.Clock()
-isCanJump = False    # станет True при нажатии пробела
-isJump = False    # для прыжка
+isCanJump = False    # для прыжка
+isJump = False    # станет True при нажатии пробела
 v = 100
-fps = 30
+jumpulse = 12
+gravity = 1
+fps = 60
 COUNT_LIFE = 3
 FLAG_PRESENT = False
 
@@ -107,11 +109,10 @@ class Player(pygame.sprite.Sprite):
         super().__init__(group)
         self.image = Player.image
         self.rect = self.image.get_rect()
-        self.velocity = [10, 0]
-        self.gravity = 1
+        self.velocity = [8, 0]
+        self.gravity = gravity
         self.rect.x = 0
         self.rect.y = y
-        self.change_y = y
         self.flag_collide = False
 
     def update(self):
@@ -150,7 +151,7 @@ class Player(pygame.sprite.Sprite):
             # это условие необходимо для прыжка.
             # isJump = True при нажатии пробела. isCanJump = True при коллайде с платформой
             isJump, isCanJump = False, False  # а неча по воздуху шпарить прыжками. теперь только до приземления
-            self.velocity[1] = -self.gravity * 10    # усилие прыжка в 10 антигравитаций
+            self.velocity[1] = -jumpulse    # прыжок силой в jumpulse
             self.image = load_image(jump_hero)  # тут изображение меняется на изображение прыжка
         self.rect.x += self.velocity[0]  # тут мы по сути просто обновляем позицию
         self.rect.y += self.velocity[1]  # игрока с учетом x,y скоростей
@@ -202,13 +203,13 @@ def present():
     global running, FLAG_PRESENT
     while running:
         screen.blit(fon, (0, 0))
+        if FLAG_PRESENT:
+            FLAG_PRESENT = False
+            return
         # внутри игрового цикла ещё один цикл
         # приема и обработки сообщений
         for event in pygame.event.get():
             # при закрытии окна
-            if FLAG_PRESENT:
-                FLAG_PRESENT = False
-                return
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
@@ -253,12 +254,12 @@ def past():
     global running, FLAG_PRESENT
     while running:
         screen.blit(fon_past, (0, 0))
+        if FLAG_PRESENT:
+            return
         # внутри игрового цикла ещё один цикл
         # приема и обработки сообщений
         for event in pygame.event.get():
             # при закрытии окна
-            if FLAG_PRESENT:
-                return
             if event.type == pygame.QUIT:
                 running = False
             if event.type == pygame.KEYDOWN:
