@@ -64,7 +64,7 @@ sprite = pygame.sprite.Sprite()
 # flag_image = pygame.transform.scale(flag_image_1, (150, 40))
 # flag = AnimatedSprite(flag_image, 3, 1, 790, 310)
 start_animation = AnimatedSprite(load_image('start_animation.png'), 2, 1, 330.5, 367.5)
-sound = pygame.mixer.Sound('Sound\American boy.mp3')
+sound = pygame.mixer.Sound('data\American boy.mp3')
 sound.play(-1)
 
 
@@ -246,7 +246,7 @@ class Player(pygame.sprite.Sprite):
             # это условие необходимо для прыжка.
             # isJump = True при нажатии пробела. isCanJump = True при коллайде с платформой
             isJump, isCanJump = False, False  # а неча по воздуху шпарить прыжками. теперь только до приземления
-            self.velocity[1] = -self.gravity * 10  # усилие прыжка в 10 антигравитаций
+            self.velocity[1] = -12  # усилие прыжка в 12 антигравитаций
             self.image = load_image(jump_hero)  # тут изображение меняется на изображение прыжка
         self.rect.x += self.velocity[0]  # тут мы по сути просто обновляем позицию
         self.rect.y += self.velocity[1]  # игрока с учетом x,y скоростей
@@ -319,30 +319,16 @@ def game_over():
 
 
 flag_pause = False
-index = 0
-current_frame = 0
-steps = ['step_1.png', 'step_2.png']
 
 
 def level(fon):
     # универсальная функция, отвечающая за основной цикл уровня
     # ранее были отдельные функции для прошлого, настоящего и будущего
     # как аргумент в неё подаётся фон времени(настоящее или прошлое или будущее)
-    global running, FLAG_NEW_LEVEL, flag_pause, current_frame, index, FLAG_GAME
+    global running, FLAG_NEW_LEVEL, flag_pause, FLAG_GAME
     while running:
         pygame.display.set_caption('American boy')
         screen.blit(fon, (0, 0))
-        current_frame += 1
-        # if current_frame == 5:
-        #     current_frame = 0
-        #     if index == 0:
-        #         image_step = load_image(steps[index])
-        #         player.step(image_step)
-        #         index = 1
-        #     else:
-        #         image_step = load_image(steps[index])
-        #         player.step(image_step)
-        #         index = 0
         if FLAG_NEW_LEVEL:
             FLAG_NEW_LEVEL = False  # при попадании в портал появляется новые уровень
             # а флаг вновь становится False
@@ -438,10 +424,9 @@ if FLAG_GAME:
 FPS = 50
 screen = pygame.display.set_mode(size)
 sound.stop()
-# fon_end = pygame.transform.scale(load_image('crest.png'), (1000, 800))
-
 
 # финальное окно сделано Иваном Рыжовым
+
 
 def show_go_screen():
     screen.fill((0, 0, 0))
@@ -474,7 +459,7 @@ def show_go_screen():
     time.sleep(1)
     screen.blit(bg, (0, 0))
     pygame.display.flip()
-    sound = pygame.mixer.Sound('Sound/anthem.mp3')
+    sound = pygame.mixer.Sound('data/anthem.mp3')
     sound.play()
 
     waiting = True
